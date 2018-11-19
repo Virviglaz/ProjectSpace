@@ -49,4 +49,5 @@ void GetScreenSize (uint16_t * width, uint16_t * height);
 void DrawCross (uint16_t x0, uint16_t y0, uint16_t size, uint32_t color);
 Font_StructTypeDef * SetFont (Font_StructTypeDef * _font);
 uint16_t PrintText (uint16_t x0, uint16_t y0, const char * text);
+void FrameBufferUpdate (void);
 #endif

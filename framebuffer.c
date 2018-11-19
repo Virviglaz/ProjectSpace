@@ -184,3 +184,9 @@ uint16_t PrintText (uint16_t x0, uint16_t y0, const char * text)
 	}
 	return Row;
 }
+
+void FrameBufferUpdate (void)
+{
+	vinfo.activate |= FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
+	ioctl(framebuffer, FBIOPUT_VSCREENINFO, &vinfo);
+}

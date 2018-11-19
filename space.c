@@ -7,12 +7,12 @@
 #include "framebuffer.h"
 #include "font8x8_basic.h"
 
-const uint16_t radius[] = { 10, 20 }; // min, max
-const uint16_t speed_x10[] = { 10, 25 }; // min, max
-const uint16_t weight[] = { 10, 100 }; // min, max
+const uint16_t radius[] = { 1, 3 }; // min, max
+const uint16_t speed_x10[] = { 10, 15 }; // min, max
+const uint16_t weight[] = { 10, 12 }; // min, max
 const uint32_t colors[] = { WHITE32, RED32, GREEN32, BLUE32, YELLOW32, CYAN32, MAGENTA32, SILVER32, GRAY32, MAROON32, OLIVE32 };
 const char * names[] = { "SUN", "MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE" };
-const double G = 10; //gravity constant
+const double G = 100; //gravity constant
 const double C = 50; //speed of light constant
 
 uint16_t lcd_width, lcd_heigh; //lcd properties
@@ -46,9 +46,9 @@ object_t ** Objects;
 
 /* Predefined objects */
 object_t planets[] = {
-	{ .color = RED32, .r = 0, .x_speed = 0, .y_speed = 0, .weight = 1000, .name = "SUN", .x = 1000, .y = 500 },
-	{ .color = GRAY32, .r = 0, .x_speed = 0, .y_speed = 30, .weight = 10, .name = "EARTH", .x = 1400, .y = 500 },
-	{ .color = YELLOW32, .r = 0, .x_speed = -10, .y_speed = 32, .weight = 0.1, .name = "MOON", .x = 1340, .y = 500 },
+	{ .color = RED32, .r = 0, .x_speed = 0, .y_speed = 5, .weight = 10, .name = "STAR 1", .x = 900, .y = 500 },
+	{ .color = GRAY32, .r = 0, .x_speed = 0, .y_speed = -5, .weight = 10, .name = "STAR 2", .x = 1200, .y = 500 },
+	//{ .color = YELLOW32, .r = 0, .x_speed = -10, .y_speed = 32, .weight = 0.1, .name = "MOON", .x = 1340, .y = 500 },
 };
 
 
@@ -89,7 +89,7 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 			move(Objects[i]);
 
 			// BORDER IMPACT
-			border_impact(Objects[i]);
+			//border_impact(Objects[i]);
 
 			// GRAVITY
 			for (uint8_t i = 0; i != objects_s; i++)
@@ -214,6 +214,10 @@ static void draw_object (object_t * object)
 {
 	if ((uint16_t)object->px == (uint16_t)object->x && (uint16_t)object->py == (uint16_t)object->y) return;
 
+	if (object->x < object->r + 5 || object->y < object->r +5 || \
+			object->x > lcd_width - object->r - 5 || object->y > lcd_heigh - object->r - 5)
+		return;
+
 	if (object->px && object->py)
 		DrawFilledCircle32(object->px, object->py, object->r, lcd_backColor); //remove object before redraw
 
@@ -228,6 +232,8 @@ static void draw_object (object_t * object)
 		font.FontColor = ~object->color;
 		PrintText(object->x - strlen(object->name) * font.FontXsize / 2, object->y - font.FontYsize / 2, object->name);
 	}
+
+	//FrameBufferUpdate();
 }
 
 static void border_impact (object_t * object)
