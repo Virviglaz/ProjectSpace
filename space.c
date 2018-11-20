@@ -12,7 +12,7 @@ const uint16_t speed_x10[] = { 10, 15 }; // min, max
 const uint16_t weight[] = { 10, 12 }; // min, max
 const uint32_t colors[] = { WHITE32, RED32, GREEN32, BLUE32, YELLOW32, CYAN32, MAGENTA32, SILVER32, GRAY32, MAROON32, OLIVE32 };
 const char * names[] = { "SUN", "MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE" };
-const double G = 100; //gravity constant
+const double G = 0.00000005; //gravity constant
 const double C = 50; //speed of light constant
 
 uint16_t lcd_width, lcd_heigh; //lcd properties
@@ -46,8 +46,8 @@ object_t ** Objects;
 
 /* Predefined objects */
 object_t planets[] = {
-	{ .color = RED32, .r = 0, .x_speed = 0, .y_speed = 5, .weight = 10, .name = "STAR 1", .x = 900, .y = 500 },
-	{ .color = GRAY32, .r = 0, .x_speed = 0, .y_speed = -5, .weight = 10, .name = "STAR 2", .x = 1200, .y = 500 },
+	{ .color = RED32, .r = 0, .x_speed = 0, .y_speed = 10, .weight = 10, .name = "STAR 1", .x = 900, .y = 500 },
+	{ .color = GRAY32, .r = 0, .x_speed = 0, .y_speed = -10, .weight = 10, .name = "STAR 2", .x = 1200, .y = 500 },
 	//{ .color = YELLOW32, .r = 0, .x_speed = -10, .y_speed = 32, .weight = 0.1, .name = "MOON", .x = 1340, .y = 500 },
 };
 
@@ -92,9 +92,11 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 			//border_impact(Objects[i]);
 
 			// GRAVITY
-			for (uint8_t i = 0; i != objects_s; i++)
+			/*for (uint8_t i = 0; i != objects_s; i++)
 				for (uint8_t j = 0; j != objects_s; j++)
-						gravity(Objects[i], Objects[j]);
+						gravity(Objects[i], Objects[j]);*/
+			for (uint8_t i = 0; i != objects_s; i++)
+				gravity(Objects[i], mass_center(Objects, objects_s));
 		}
 
 	}
@@ -245,7 +247,7 @@ static void border_impact (object_t * object)
 static object_t * mass_center (object_t ** objects, uint16_t object_s)
 {
 	const uint8_t cross_size = 10;
-	static object_t _mass_center = { .x = 100, .y = 100, .px = 100, .py = 100, .weight = 0 };
+	static object_t _mass_center = { .x = 100, .y = 100, .px = 100, .py = 100, .weight = 0, .isAlive = true };
 
 	if (_mass_center.weight == 0)
 		for (uint16_t i = 0; i != object_s; i++)
@@ -255,10 +257,11 @@ static object_t * mass_center (object_t ** objects, uint16_t object_s)
 	_mass_center.y = 0;
 
 	for (uint16_t i = 0; i != object_s; i++)
-	{
-		_mass_center.x += objects[i]->x * objects[i]->weight;
-		_mass_center.y += objects[i]->y * objects[i]->weight;
-	}
+		if (objects[i]->isAlive)
+		{
+			_mass_center.x += objects[i]->x * objects[i]->weight;
+			_mass_center.y += objects[i]->y * objects[i]->weight;
+		}
 
 	_mass_center.x /= _mass_center.weight;
 	_mass_center.y /= _mass_center.weight;
@@ -295,12 +298,15 @@ static void gravity (object_t * object, object_t * ref_object)
 		return;
 	}
 
-	double _vectorSpeed = G * ref_object->weight / _distanceSquare;
+	//angle between object and ref_object
+	double alpha = atan2((object->y - ref_object->y), (object->x - ref_object->x));
 
-	double _distance = sqrt(_distanceSquare);
+	//absolute acceleration from gravity law
+	double acc = - G * ref_object->weight * _distanceSquare;
 
-	object->x_speed += (ref_object->x - object->x) * _vectorSpeed / _distance;
-	object->y_speed += (ref_object->y - object->y) * _vectorSpeed / _distance;
+	//apply acceleration
+	object->x_speed += acc * cos(alpha);
+	object->y_speed += acc * sin(alpha);
 
 	if (object->x_speed > C || object->x_speed < -C) //speed of light limit for x
 		object->x_speed = 0;
