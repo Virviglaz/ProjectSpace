@@ -8,12 +8,13 @@
 #include "font8x8_basic.h"
 
 const uint16_t radius[] = { 2, 5 }; // min, max
-const uint16_t speed_x10[] = { 2, 10 }; // min, max
+const uint16_t speed_x10[] = { 1, 10 }; // min, max
 const uint16_t weight[] = { 1, 5 }; // min, max
 const uint32_t colors[] = { WHITE32, RED32, GREEN32, BLUE32, YELLOW32, CYAN32, MAGENTA32, SILVER32, GRAY32, MAROON32, OLIVE32 };
 const char * names[] = { "SUN", "MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE" };
 const double G = 0.000000005; //gravity constant
-const double C = 50; //speed of light constant
+const double C = 500; //speed of light constant
+double X = 0, Y = 0; //offset to center screen
 
 uint16_t lcd_width, lcd_heigh; //lcd properties
 uint32_t lcd_backColor;
@@ -165,8 +166,8 @@ static object_t * create_random_object (void)
 	object->r = rand() % (radius[1] - radius[0]) + radius[0];
 	object->x = rand() % (lcd_width - 2 * object->r) + object->r;
 	object->y = rand() % (lcd_heigh - 2 * object->r) + object->r;
-	object->x_speed = (float)((int16_t)rand() % (speed_x10[1] - speed_x10[0]) + speed_x10[0]) / 10;
-	object->y_speed = (float)((int16_t)rand() % (speed_x10[1] - speed_x10[0]) + speed_x10[0]) / 10;
+	object->x_speed = rand() % (speed_x10[1] - speed_x10[0]) + speed_x10[0];
+	object->y_speed = rand() % (speed_x10[1] - speed_x10[0]) + speed_x10[0];
 	object->color = colors[rand() % (sizeof(colors) / sizeof(colors[0]))];
 	object->px = 0;
 	object->py = 0;
@@ -174,6 +175,9 @@ static object_t * create_random_object (void)
 	object->name = i < (sizeof(names) / sizeof(*names)) ? names[i++] : "Undefined";
 	object->isMoving = true;
 	object->isAlive = true;
+
+	object->x_speed *= rand() > rand() ? 1 : -1;
+	object->y_speed *= rand() > rand() ? 1 : -1;
 
 	printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %3.0f\n",\
 			object->name, object->x, object->y, object->r, object->x_speed, object->y_speed, object->weight);
@@ -205,8 +209,8 @@ static void move (object_t * object)
 	if (!object->isMoving)
 		return;
 
-	object->x += object->x_speed / 10;
-	object->y += object->y_speed / 10;
+	object->x += object->x_speed / 10 - X;
+	object->y += object->y_speed / 10 - Y;
 
 	draw_object(object);
 
@@ -269,6 +273,9 @@ static object_t * mass_center (object_t ** objects, uint16_t object_s)
 	_mass_center.x /= _mass_center.weight;
 	_mass_center.y /= _mass_center.weight;
 
+	X = _mass_center.x - lcd_width / 2;
+	Y = _mass_center.y - lcd_heigh / 2;
+
 	DrawCross(_mass_center.px, _mass_center.py, cross_size, lcd_backColor);
 	DrawCross(_mass_center.x, _mass_center.y, cross_size, 0xFFFFFF00);
 
@@ -299,6 +306,8 @@ static void gravity (object_t * object, object_t * ref_object)
 		ref_object->weight += object->weight; //add his mass to reference object
 
 		ref_object->r += sqrt(object->r); //and increase size
+
+		printf("Impact between %s and %s\n", object->name, ref_object->name);
 
 		return;
 	}
