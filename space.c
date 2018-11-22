@@ -15,6 +15,7 @@ const char * names[] = { "SUN", "MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", 
 const double G = 0.000000005; //gravity constant
 const double C = 500; //speed of light constant
 double X = 0, Y = 0; //offset to center screen
+const uint8_t GAP = 5;
 
 uint16_t lcd_width, lcd_heigh; //lcd properties
 uint32_t lcd_backColor;
@@ -213,21 +214,21 @@ static void move (object_t * object)
 	object->y += object->y_speed / 10 - Y;
 
 	draw_object(object);
-
-	object->px = object->x;
-	object->py = object->y;
 }
 
 static void draw_object (object_t * object)
 {
 	if ((uint16_t)object->px == (uint16_t)object->x && (uint16_t)object->py == (uint16_t)object->y) return;
 
-	if (object->x < object->r + 5 || object->y < object->r +5 || \
-			object->x > lcd_width - object->r - 5 || object->y > lcd_heigh - object->r - 5)
-		return;
-
 	if (object->px && object->py)
 		DrawFilledCircle32(object->px, object->py, object->r, lcd_backColor); //remove object before redraw
+
+	if (object->x < object->r + GAP || object->y < object->r + GAP || \
+			object->x > lcd_width - object->r - GAP || object->y > lcd_heigh - object->r - GAP)
+		return;
+
+	object->px = object->x;
+	object->py = object->y;
 
 	if (!object->isAlive) return;
 
