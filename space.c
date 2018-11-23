@@ -72,6 +72,7 @@ static double energy_summary (object_t ** object, uint16_t object_s, object_t * 
 static void process_impact (object_t * object, object_t * ref_object);
 static void process_impact_all (object_t ** object, uint16_t object_s);
 static void gravity_object_to_object (object_t ** object, uint16_t object_s);
+static void gravity_oject_to_massCenter (object_t ** object, uint16_t object_s, object_t * massCenter);
 
 /**
  * Initialize and run simulation
@@ -99,14 +100,14 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 			// BORDER IMPACT
 			//border_impact(Objects[i]);
 
+			// IMPACT PROCESS
 			process_impact_all(Objects, objects_s);
+
+			// GRAVITY FOR EACH OBJECT OR TO MASS CENTER
 			gravity_object_to_object(Objects, objects_s);
 
 			object_t * _mass_center = mass_center(Objects, objects_s);
-
-			// GRAVITY FOR EACH OBJECT
-			//for (uint8_t i = 0; i != objects_s; i++)
-				//gravity(Objects[i], _mass_center);
+			//gravity_oject_to_massCenter(Objects, objects_s, _mass_center);
 
 			//energy_summary(Objects, objects_s, _mass_center);
 		}
@@ -393,4 +394,10 @@ static void gravity_object_to_object (object_t ** object, uint16_t object_s)
 	for (uint8_t i = 0; i != object_s; i++)
 		for (uint8_t j = 0; j != object_s; j++)
 			gravity(object[i], object[j]);
+}
+
+static void gravity_oject_to_massCenter (object_t ** object, uint16_t object_s, object_t * massCenter)
+{
+	for (uint8_t i = 0; i != object_s; i++)
+		gravity(object[i], massCenter);
 }
