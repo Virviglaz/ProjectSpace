@@ -9,11 +9,10 @@
 
 const uint16_t radius[] = { 2, 5 }; // min, max
 const uint16_t speed_x10[] = { 1, 10 }; // min, max
-const uint16_t weight[] = { 1, 5 }; // min, max
+const uint16_t weight[] = { 10, 50 }; // min, max
 const uint32_t colors[] = { WHITE32, RED32, GREEN32, BLUE32, YELLOW32, CYAN32, MAGENTA32, SILVER32, GRAY32, MAROON32, OLIVE32 };
 const char * names[] = { "SUN", "MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE" };
-const double G = 0.000000005; //gravity constant
-const double C = 500; //speed of light constant
+const double G = 10; //gravity constant
 double X = 0, Y = 0; //offset to center screen
 const uint8_t GAP = 5;
 
@@ -30,7 +29,7 @@ typedef struct
 	double weight;
 
 	//current positions and speeds
-	double x_speed, y_speed;
+	double x_speed, y_speed, acceleration;
 
 	//previous positions
 	double x, y, px, py;
@@ -41,6 +40,8 @@ typedef struct
 
 	//after impact 2 objects become 1
 	bool isAlive;
+
+	bool isMassCenter;
 }object_t;
 
 /* Objects */
@@ -49,8 +50,9 @@ object_t ** Objects;
 /* Predefined objects */
 object_t planets[] = {
 	{ .color = RED32, .r = 50, .x_speed = 0, .y_speed = -1, .weight = 100, .name = "STAR", .x = 900, .y = 500 },
-	{ .color = GRAY32, .r = 0, .x_speed = 0, .y_speed = 10, .weight = 10, .name = "PLANET", .x = 1200, .y = 500 },
-	//{ .color = YELLOW32, .r = 7, .x_speed = 0, .y_speed = 11.5, .weight = 0.1, .name = "MOON", .x = 1230, .y = 500 },
+	{ .color = GRAY32, .r = 10, .x_speed = 0, .y_speed = 10, .weight = 10, .name = "PLANET", .x = 1200, .y = 500 },
+	{ .color = YELLOW32, .r = 5, .x_speed = 0, .y_speed = 25, .weight = 0.1, .name = "MOON", .x = 1230, .y = 500 },
+	{ .color = BLUE32, .r = 10, .x_speed = 0, .y_speed = -7, .weight = 10, .name = "MOON", .x = 400, .y = 500 },
 };
 
 
@@ -66,6 +68,10 @@ static void draw_object (object_t * object);
 static void border_impact (object_t * object);
 static object_t * mass_center (object_t ** objects, uint16_t object_s);
 static void gravity (object_t * object, object_t * ref_object);
+static double energy_summary (object_t ** object, uint16_t object_s, object_t * massCenter);
+static void process_impact (object_t * object, object_t * ref_object);
+static void process_impact_all (object_t ** object, uint16_t object_s);
+static void gravity_object_to_object (object_t ** object, uint16_t object_s);
 
 /**
  * Initialize and run simulation
@@ -93,14 +99,16 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 			// BORDER IMPACT
 			//border_impact(Objects[i]);
 
-			// GRAVITY
-			for (uint8_t i = 0; i != objects_s; i++)
-				for (uint8_t j = 0; j != objects_s; j++)
-						gravity(Objects[i], Objects[j]);
+			process_impact_all(Objects, objects_s);
+			gravity_object_to_object(Objects, objects_s);
 
-			mass_center(Objects, objects_s);
+			object_t * _mass_center = mass_center(Objects, objects_s);
+
+			// GRAVITY FOR EACH OBJECT
 			//for (uint8_t i = 0; i != objects_s; i++)
-				//gravity(Objects[i], mass_center(Objects, objects_s));
+				//gravity(Objects[i], _mass_center);
+
+			//energy_summary(Objects, objects_s, _mass_center);
 		}
 
 	}
@@ -133,6 +141,7 @@ static object_t ** create_predefined_objects (uint16_t * amount)
 		//object can move
 		_objects[i]->isMoving = true;
 		_objects[i]->isAlive = true;
+		_objects[i]->isMassCenter = false;
 
 		printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %4.0f\n",\
 				_objects[i]->name, _objects[i]->x, _objects[i]->y, _objects[i]->r, _objects[i]->x_speed, _objects[i]->y_speed, _objects[i]->weight);
@@ -173,9 +182,18 @@ static object_t * create_random_object (void)
 	object->px = 0;
 	object->py = 0;
 	object->weight = rand() % (weight[1] - weight[0]) + weight[0];
-	object->name = i < (sizeof(names) / sizeof(*names)) ? names[i++] : "Undefined";
 	object->isMoving = true;
 	object->isAlive = true;
+	object->isMassCenter = false;
+
+	if (i < (sizeof(names) / sizeof(*names)))
+		object->name = names[i];
+	else
+	{
+		object->name = malloc(20);
+		sprintf((void*)object->name, "Object %u", i);
+	}
+	i++;
 
 	object->x_speed *= rand() > rand() ? 1 : -1;
 	object->y_speed *= rand() > rand() ? 1 : -1;
@@ -254,7 +272,7 @@ static void border_impact (object_t * object)
 static object_t * mass_center (object_t ** objects, uint16_t object_s)
 {
 	const uint8_t cross_size = 10;
-	static object_t _mass_center = { .x = 100, .y = 100, .px = 100, .py = 100, .weight = 0, .isAlive = true };
+	static object_t _mass_center = { .x = 100, .y = 100, .px = 100, .py = 100, .weight = 0, .isAlive = true, .isMassCenter = true };
 
 	//we calculate total mass only once. Total mass should be constant
 	if (_mass_center.weight == 0)
@@ -293,41 +311,86 @@ static void gravity (object_t * object, object_t * ref_object)
 
 	double _distanceSquare = distanceSquare(object, ref_object);
 
-	if (check_impact(object, ref_object)) //impact
-	{
-		object->isAlive = false; //kill object
-		ref_object->isAlive = true; //reference object survive
-
-		ref_object->x_speed = (ref_object->x_speed * ref_object->weight + object->x_speed * object->weight)\
-				/ (ref_object->weight + object->weight);
-
-		ref_object->y_speed = (ref_object->y_speed * ref_object->weight + object->y_speed * object->weight)\
-				/ (ref_object->weight + object->weight);
-
-		ref_object->weight += object->weight; //add his mass to reference object
-
-		ref_object->r += sqrt(object->r); //and increase size
-
-		printf("Impact between %s and %s\n", object->name, ref_object->name);
-
-		return;
-	}
-
 	//angle between object and ref_object
 	double alpha = atan2((object->y - ref_object->y), (object->x - ref_object->x));
 
 	//absolute acceleration from gravity law
-	double acc = - G * ref_object->weight * _distanceSquare;
+	object->acceleration = - G * ref_object->weight / _distanceSquare;
 
 	//apply acceleration
-	object->x_speed += acc * cos(alpha);
-	object->y_speed += acc * sin(alpha);
-
-	//to prevent system out of control, using speed of light limitation (should not happens in reality)
-	if (object->x_speed > C || object->x_speed < -C) //speed of light limit for x
-		object->x_speed = 0;
-
-	if (object->y_speed > C || object->y_speed < -C) //speed of light limit for y
-		object->y_speed = 0;
+	object->x_speed += object->acceleration * cos(alpha);
+	object->y_speed += object->acceleration * sin(alpha);
 }
 
+static double energy_summary (object_t ** object, uint16_t object_s, object_t * massCenter)
+{
+	static uint16_t j = 0;
+	double potential_energy = 0, cinetic_energy = 0;
+
+	for (uint16_t i = 0; i < object_s; i++)
+	{
+		potential_energy += object[i]->weight * (object[i]->x_speed * object[i]->x_speed + object[i]->y_speed * object[i]->y_speed) / 2;
+		cinetic_energy += - object[i]->weight * object[i]->acceleration * distance(object[i], massCenter);
+	}
+
+
+	if (++j == 100)
+	{
+		j = 0;
+		printf("Pot energy: %.1f\tCinetic energy: %.1f\tSumm: %.1f\n", \
+				potential_energy, cinetic_energy, potential_energy + cinetic_energy);
+	}
+
+	return potential_energy;
+}
+
+static void process_impact (object_t * object, object_t * ref_object)
+{
+	if (object == ref_object) return; //object cannot be compared to himself
+
+	if (!object->isAlive || !ref_object->isAlive) return; //dead object (after impact)
+
+	if (!ref_object->isMassCenter) //we don't check impact with mass center - it is not a phisical object
+		if (check_impact(object, ref_object)) //impact
+		{
+			object_t * o1, * o2;
+
+			if (object->weight > ref_object->weight)
+				o1 = object, o2 = ref_object;
+			else
+				o2 = object, o1 = ref_object;
+
+			o2->isAlive = false; //kill first object
+			o1->isAlive = true; //second object survive
+
+			o1->x_speed = (o1->x_speed * o1->weight + o2->x_speed * o2->weight)\
+					/ (o1->weight + o2->weight);
+
+			o1->y_speed = (o1->y_speed * o1->weight + o2->y_speed * o2->weight)\
+					/ (o1->weight + o2->weight);
+
+			o1->weight += o2->weight; //add his mass to reference object
+
+			o1->r = sqrt(pow(o2->r, 2) + pow(o1->r, 2)); //and increase size
+
+			o1->color = (o1->color + o2->color) / 2; //mix color
+
+			printf("Impact between %s and %s\n", o1->name, o2->name);
+
+			return;
+		}
+}
+
+static void process_impact_all (object_t ** object, uint16_t object_s)
+{
+	for (uint8_t i = 0; i != object_s; i++)
+		for (uint8_t j = 0; j != object_s; j++)
+			process_impact(object[i], object[j]);
+}
+
+static void gravity_object_to_object (object_t ** object, uint16_t object_s)
+{
+	for (uint8_t i = 0; i != object_s; i++)
+		for (uint8_t j = 0; j != object_s; j++)
+			gravity(object[i], object[j]);
+}
