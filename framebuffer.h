@@ -33,7 +33,8 @@ typedef struct
 	uint32_t FontColor, BackColor;
 }Font_StructTypeDef;
 
-const char * FrameBufferInit (const char * io);
+const char * FrameBufferInit (const char * io, uint8_t buffers, void * extBuffer);
+void SetResolution (uint16_t x, uint16_t y);
 void FrameBufferDeInit (void);
 void ClearScreen (uint32_t color);
 void SetWindow (uint16_t x0, uint16_t y0, uint16_t size_x, uint16_t size_y);
@@ -46,6 +47,7 @@ void DrawVerticalLine32 (uint16_t x0, uint16_t y0, uint16_t y1, uint32_t color);
 void DrawCircle32(int16_t x0, int16_t y0, int16_t r, uint32_t color);
 void DrawFilledCircle32 (int16_t x0, int16_t y0, int16_t r, uint32_t color);
 void GetScreenSize (uint16_t * width, uint16_t * height);
+const char * SetScreenSize (uint16_t width, uint16_t height, uint8_t buffers);
 void DrawCross (uint16_t x0, uint16_t y0, uint16_t size, uint32_t color);
 Font_StructTypeDef * SetFont (Font_StructTypeDef * _font);
 uint16_t PrintText (uint16_t x0, uint16_t y0, const char * text);

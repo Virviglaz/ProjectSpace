@@ -1,6 +1,8 @@
 #include "framebuffer.h"
 #include <string.h>
 
+#include "dri_buffer.h"
+
 struct fb_var_screeninfo vinfo; //can be used as public
 
 static int framebuffer = 0;
@@ -16,7 +18,7 @@ static struct
 } window = { .windowInit = false };
 
 
-const char * FrameBufferInit (const char * io)
+const char * FrameBufferInit (const char * io, uint8_t buffers, void * extBuffer)
 {
 	if (io == NULL) io = "/dev/fb0"; //default to main screen
 	
@@ -33,9 +35,21 @@ const char * FrameBufferInit (const char * io)
 
 	screenSize = vinfo.xres * vinfo.yres * vinfo.bits_per_pixel / 8;
 
-	imagebuffer = (void *)mmap(0, screenSize, PROT_READ | PROT_WRITE, MAP_SHARED, framebuffer, 0);
+	vinfo.yres_virtual = buffers ? vinfo.yres * buffers : vinfo.yres;
+
+	if (ioctl(framebuffer, FBIOPUT_VSCREENINFO, &vinfo) < 0)
+				return "Fail set info structure!";
+
+	imagebuffer = extBuffer ? (uint32_t*)extBuffer : (void *)mmap(0, screenSize, 
+				PROT_READ | PROT_WRITE, MAP_SHARED, framebuffer, 0);
 
 	return "OK";
+}
+
+void SetResolution (uint16_t x, uint16_t y)
+{
+	vinfo.xres = x;
+	vinfo.yres = y;
 }
 
 void FrameBufferDeInit (void)
@@ -69,6 +83,8 @@ void FillWindow (uint32_t color)
 
 	window.x = 0;
 	window.ptr += vinfo.xres - window.x_max;
+
+
 }
 
 void FlushWindow (uint16_t x0, uint16_t y0, uint16_t size_x, uint16_t size_y, uint32_t * color)
@@ -142,6 +158,17 @@ void GetScreenSize (uint16_t * width, uint16_t * height)
 {
 	*width = vinfo.xres;
 	*height = vinfo.yres;
+}
+
+const char * SetScreenSize (uint16_t width, uint16_t height, uint8_t buffers)
+{
+	vinfo.xres = width;
+	vinfo.yres = height;
+
+	vinfo.xres_virtual = vinfo.xres;
+	vinfo.yres_virtual = buffers ? vinfo.yres * buffers : vinfo.yres;
+
+	return ioctl(framebuffer, FBIOPUT_VSCREENINFO, &vinfo) < 0 ? "Failed to set structure" : "OK";
 }
 
 void DrawCross (uint16_t x0, uint16_t y0, uint16_t size, uint32_t color)
