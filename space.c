@@ -28,6 +28,8 @@ typedef struct
 	uint16_t r; //radius
 	double weight;
 
+	//uint32_t * sprite;
+
 	//current positions and speeds
 	double x_speed, y_speed, acceleration;
 
@@ -42,6 +44,8 @@ typedef struct
 	bool isAlive;
 
 	bool isMassCenter;
+
+	bool fillLastTime;
 }object_t;
 
 /* Objects */
@@ -111,7 +115,7 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 
 			//energy_summary(Objects, objects_s, _mass_center);
 		}
-
+		FrameBufferUpdate();
 	}
 }
 
@@ -143,6 +147,7 @@ static object_t ** create_predefined_objects (uint16_t * amount)
 		_objects[i]->isMoving = true;
 		_objects[i]->isAlive = true;
 		_objects[i]->isMassCenter = false;
+		_objects[i]->fillLastTime = false;
 
 		printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %4.0f\n",\
 				_objects[i]->name, _objects[i]->x, _objects[i]->y, _objects[i]->r, _objects[i]->x_speed, _objects[i]->y_speed, _objects[i]->weight);
@@ -186,6 +191,7 @@ static object_t * create_random_object (void)
 	object->isMoving = true;
 	object->isAlive = true;
 	object->isMassCenter = false;
+	object->fillLastTime = false;
 
 	if (i < (sizeof(names) / sizeof(*names)))
 		object->name = names[i];
@@ -238,6 +244,15 @@ static void move (object_t * object)
 static void draw_object (object_t * object)
 {
 	if ((uint16_t)object->px == (uint16_t)object->x && (uint16_t)object->py == (uint16_t)object->y) return;
+
+	if (object->fillLastTime)
+	{
+		object->fillLastTime = false;
+		DrawFilledCircle32(object->px, object->py, object->r, lcd_backColor); //remove object last time
+	}
+
+	if (!object->isAlive)
+		return;
 
 	if (object->px && object->py)
 		DrawFilledCircle32(object->px, object->py, object->r, lcd_backColor); //remove object before redraw
@@ -363,6 +378,7 @@ static void process_impact (object_t * object, object_t * ref_object)
 
 			o2->isAlive = false; //kill first object
 			o1->isAlive = true; //second object survive
+			o2->fillLastTime = true;
 
 			o1->x_speed = (o1->x_speed * o1->weight + o2->x_speed * o2->weight)\
 					/ (o1->weight + o2->weight);

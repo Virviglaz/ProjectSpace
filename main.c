@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv)
 {
-	printf("Framebuffer: %s\n", FrameBufferInit(0));
+	printf("Framebuffer: %s\n", FrameBufferInit(0, 0));
 
 	extern void space_init (uint16_t objects, uint32_t backColor);
 	space_init(argc == 2 ? atoi(argv[1]) : 0, BLACK32);
