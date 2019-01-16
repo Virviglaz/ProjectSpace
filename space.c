@@ -14,7 +14,7 @@ const uint32_t colors[] = { WHITE32, RED32, GREEN32, BLUE32, YELLOW32, CYAN32, M
 const char * names[] = { "SUN", "MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE" };
 const double G = 1; //gravity constant
 const uint8_t GAP = 5;
-struct 
+struct
 {
 	double X, Y;
 }screen_center;
@@ -51,36 +51,36 @@ object_t ** Objects;
 
 /* Predefined objects */
 object_t planets[] = {
-	{ .color = RED32, .r = 50, .vx = 0, .vy = 0, .weight = 10000, .name = "STAR", .x = 0, .y = 0 },
-	{ .color = GRAY32, .r = 10, .vx = 0, .vy = 3, .weight = 1000, .name = "PLANET", .x = 500, .y = 0 },
-	{ .color = YELLOW32, .r = 5, .vx = 0, .vy = 8.7, .weight = 10, .name = "MOON", .x = 530, .y = 0 },
-	{ .color = BLUE32, .r = 10, .vx = 0, .vy = -3, .weight = 1000, .name = "MOON", .x = -500, .y = 0 },
+	{.color = RED32,.r = 50,.vx = 0,.vy = 0,.weight = 10000,.name = "STAR",.x = 0,.y = 0 },
+	{.color = GRAY32,.r = 10,.vx = 0,.vy = 5,.weight = 1000,.name = "PLANET",.x = 500,.y = 0 },
+	{.color = YELLOW32,.r = 5,.vx = 0,.vy = 10.8,.weight = 10,.name = "MOON",.x = 530,.y = 0 },
+	{.color = BLUE32,.r = 10,.vx = 0,.vy = -7,.weight = 100,.name = "MOON",.x = -200,.y = 0 },
 	//{ .color = GREEN32, .r = 10, .vx = -6,. vy = 0, .weight = 1000, .name = "MOON", .x = 0, .y = 500 },
 };
 
 
 /* Functions */
-static object_t ** create_predefined_objects (uint16_t * amount);
-static object_t ** create_random_objects (uint16_t amount);
-static object_t * create_random_object (void);
-static double distance (object_t * o1, object_t * o2);
-static double distanceSquare (object_t * o1, object_t * o2);
-static bool check_impact (object_t * o1, object_t * o2);
-static void move (object_t ** objects, uint16_t object_s);
-static void draw_object (object_t ** objects, uint16_t object_s);
-static void border_impact (object_t * object);
-static object_t * mass_center (object_t ** objects, uint16_t object_s);
-static void gravity (object_t * object, object_t * ref_object);
-static void process_impact (object_t * object, object_t * ref_object);
-static void process_impact_all (object_t ** object, uint16_t object_s);
-static void gravity_object_to_object (object_t ** object, uint16_t object_s);
-static void gravity_oject_to_massCenter (object_t ** object, uint16_t object_s, object_t * massCenter);
+static object_t ** create_predefined_objects(uint16_t * amount);
+static object_t ** create_random_objects(uint16_t amount);
+static object_t * create_random_object(void);
+static double distance(object_t * o1, object_t * o2);
+static double distanceSquare(object_t * o1, object_t * o2);
+static bool check_impact(object_t * o1, object_t * o2);
+static void move(object_t ** objects, uint16_t object_s);
+static void draw_object(object_t ** objects, uint16_t object_s);
+static void border_impact(object_t * object);
+static object_t * mass_center(object_t ** objects, uint16_t object_s);
+static void gravity(object_t * object, object_t * ref_object);
+static void process_impact(object_t * object, object_t * ref_object);
+static void process_impact_all(object_t ** object, uint16_t object_s);
+static void gravity_object_to_object(object_t ** object, uint16_t object_s);
+static void gravity_oject_to_massCenter(object_t ** object, uint16_t object_s, object_t * massCenter);
 static uint32_t mix_color(uint32_t c1, uint32_t c2, double w1, double w2);
 
 /**
  * Initialize and run simulation
  */
-void space_init (uint16_t objects_s, uint32_t backColor)
+void space_init(uint16_t objects_s, uint32_t backColor)
 {
 	GetScreenSize(&lcd_width, &lcd_heigh);
 	printf("Screen: %u x %u\n", lcd_width, lcd_heigh);
@@ -94,36 +94,38 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 	//run with parameter ('./ps 2') will init 2 random objects, otherwise will use predefined ones
 	Objects = objects_s ? create_random_objects(objects_s) : create_predefined_objects(&objects_s);
 
-	while(1)
+	while (1)
 	{
 		usleep(10000);
-		//for (uint8_t i = 0; i != objects_s; i++)
-		{
-			mass_center(Objects, objects_s);
-			//gravity_oject_to_massCenter(Objects, objects_s, _mass_center);
+		object_t * _mass_center = mass_center(Objects, objects_s);
+		//gravity_oject_to_massCenter(Objects, objects_s, _mass_center);
 
-			// MOVEMENT
-			move(Objects, objects_s);
+		// MOVEMENT
+		move(Objects, objects_s);
 
-			draw_object(Objects, objects_s);
+		draw_object(Objects, objects_s);
 
-			// BORDER IMPACT
-			//border_impact(Objects[i]);
+		// BORDER IMPACT
+		//border_impact(Objects[i]);
 
-			// IMPACT PROCESS
-			process_impact_all(Objects, objects_s);
+		// IMPACT PROCESS
+		process_impact_all(Objects, objects_s);
 
-			// GRAVITY FOR EACH OBJECT OR TO MASS CENTER
-			gravity_object_to_object(Objects, objects_s);
-		}
+		// GRAVITY FOR EACH OBJECT OR TO MASS CENTER
+		gravity_object_to_object(Objects, objects_s);
+
 		FrameBufferUpdate();
+
+		/* Center mass -> screen center */
+		screen_center.X = lcd_width / 2 - _mass_center->x;
+		screen_center.Y = lcd_heigh / 2 - _mass_center->y;
 	}
 }
 
 /**
  * Create object array from 'planets' array
  */
-static object_t ** create_predefined_objects (uint16_t * amount)
+static object_t ** create_predefined_objects(uint16_t * amount)
 {
 	const uint8_t _objects_s = sizeof(planets) / sizeof(object_t); //amount of objects defined in 'planets[]' array
 
@@ -150,8 +152,8 @@ static object_t ** create_predefined_objects (uint16_t * amount)
 		_objects[i]->isMassCenter = false;
 		_objects[i]->fillLastTime = false;
 
-		printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %4.0f\n",\
-				_objects[i]->name, _objects[i]->x, _objects[i]->y, _objects[i]->r, _objects[i]->vx, _objects[i]->vy, _objects[i]->weight);
+		printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %4.0f\n", \
+			_objects[i]->name, _objects[i]->x, _objects[i]->y, _objects[i]->r, _objects[i]->vx, _objects[i]->vy, _objects[i]->weight);
 	}
 
 	return _objects;
@@ -160,7 +162,7 @@ static object_t ** create_predefined_objects (uint16_t * amount)
 /**
  * Create random object array
  */
-static object_t ** create_random_objects (uint16_t amount)
+static object_t ** create_random_objects(uint16_t amount)
 {
 	object_t ** _objects = malloc(sizeof(object_t *) * amount);
 
@@ -175,10 +177,10 @@ static object_t ** create_random_objects (uint16_t amount)
 /**
  * Create random object
  */
-static object_t * create_random_object (void)
+static object_t * create_random_object(void)
 {
 	static uint8_t i = 0;
-	object_t * object = malloc (sizeof(object_t));
+	object_t * object = malloc(sizeof(object_t));
 
 	object->r = rand() % (radius[1] - radius[0]) + radius[0];
 	object->x = rand() % (lcd_width - 2 * object->r) + object->r;
@@ -206,32 +208,32 @@ static object_t * create_random_object (void)
 	object->vx *= rand() > rand() ? 1 : -1;
 	object->vy *= rand() > rand() ? 1 : -1;
 
-	printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %3.0f\n",\
-			object->name, object->x, object->y, object->r, object->vx, object->vy, object->weight);
+	printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %3.0f\n", \
+		object->name, object->x, object->y, object->r, object->vx, object->vy, object->weight);
 
 	return object;
 }
 
-static double distance (object_t * o1, object_t * o2)
+static double distance(object_t * o1, object_t * o2)
 {
 	double dx = o1->x - o2->x;
 	double dy = o1->y - o2->y;
 	return sqrt(dx * dx + dy * dy);
 }
 
-static double distanceSquare (object_t * o1, object_t * o2)
+static double distanceSquare(object_t * o1, object_t * o2)
 {
 	double dx = o1->x - o2->x;
 	double dy = o1->y - o2->y;
 	return dx * dx + dy * dy;
 }
 
-static bool check_impact (object_t * o1, object_t * o2)
+static bool check_impact(object_t * o1, object_t * o2)
 {
 	return distance(o1, o2) < (o1->r + o2->r) ? true : false;
 }
 
-static void move (object_t ** objects, uint16_t object_s)
+static void move(object_t ** objects, uint16_t object_s)
 {
 	for (uint16_t i = 0; i != object_s; i++)
 	{
@@ -248,53 +250,54 @@ static void move (object_t ** objects, uint16_t object_s)
 	}
 }
 
-static void draw_object (object_t ** objects, uint16_t object_s)
+static void draw_object(object_t ** objects, uint16_t object_s)
 {
 	for (uint16_t i = 0; i != object_s; i++)
 	{
+		double x = screen_center.X + objects[i]->x, y = screen_center.Y + objects[i]->y; //relative -> absolute coordinates
+
 		if (objects[i]->fillLastTime)
 		{
 			objects[i]->fillLastTime = false;
-			DrawFilledCircle32(screen_center.X + objects[i]->px, screen_center.Y + objects[i]->py, objects[i]->r, lcd_backColor); //remove object last time
+			DrawFilledCircle32(objects[i]->px, objects[i]->py, objects[i]->r, lcd_backColor); //remove object last time
 		}
 
 		if (!objects[i]->isAlive)
 			continue;
 
 		if (objects[i]->px || objects[i]->py)
-			DrawFilledCircle32(screen_center.X + objects[i]->px, screen_center.Y + objects[i]->py, objects[i]->r, lcd_backColor); //remove object before redraw
+			DrawFilledCircle32(objects[i]->px, objects[i]->py, objects[i]->r, lcd_backColor); //remove object before redraw
 
-		if (screen_center.X + objects[i]->x < objects[i]->r + GAP || screen_center.Y + objects[i]->y < objects[i]->r + GAP || \
-			screen_center.X + objects[i]->x > lcd_width - objects[i]->r - GAP || screen_center.Y + objects[i]->y > lcd_heigh - objects[i]->r - GAP)
+		if (x < objects[i]->r + GAP || y < objects[i]->r + GAP || x > lcd_width - objects[i]->r - GAP || y > lcd_heigh - objects[i]->r - GAP)
 			continue;
 
-		objects[i]->px = objects[i]->x;
-		objects[i]->py = objects[i]->y;
+		objects[i]->px = x;
+		objects[i]->py = y;
 
 		if (!objects[i]->isAlive) continue;
 
-		DrawFilledCircle32(screen_center.X + objects[i]->x, screen_center.Y + objects[i]->y, objects[i]->r, objects[i]->color);
+		DrawFilledCircle32(x, y, objects[i]->r, objects[i]->color);
 
 		if (objects[i]->name)
 		{
 			if (strlen(objects[i]->name) * font.FontXsize / 2 > objects[i]->r) continue;
 			font.BackColor = objects[i]->color;
 			font.FontColor = ~objects[i]->color;
-			PrintText(screen_center.X + objects[i]->x - strlen(objects[i]->name) * font.FontXsize / 2, screen_center.Y + objects[i]->y - font.FontYsize / 2, objects[i]->name);
+			PrintText(x - strlen(objects[i]->name) * font.FontXsize / 2, y - font.FontYsize / 2, objects[i]->name);
 		}
 	}
 }
 
-static void border_impact (object_t * object)
+static void border_impact(object_t * object)
 {
 	if ((object->x <= (object->r + 5)) || (object->x >= (lcd_width - object->r - 5))) object->vx *= -1;
 	if ((object->y <= (object->r + 5)) || (object->y >= (lcd_heigh - object->r - 5))) object->vy *= -1;
 }
 
-static object_t * mass_center (object_t ** objects, uint16_t object_s)
+static object_t * mass_center(object_t ** objects, uint16_t object_s)
 {
 	const uint8_t cross_size = 10;
-	static object_t _mass_center = { .x = 100, .y = 100, .px = 100, .py = 100, .weight = 0, .isAlive = true, .isMassCenter = true };
+	static object_t _mass_center = { .x = 100,.y = 100,.px = 100,.py = 100,.weight = 0,.isAlive = true,.isMassCenter = true, .color = YELLOW32 };
 
 	//we calculate total mass only once. Total mass should be constant
 	if (_mass_center.weight == 0)
@@ -314,19 +317,18 @@ static object_t * mass_center (object_t ** objects, uint16_t object_s)
 	_mass_center.x /= _mass_center.weight;
 	_mass_center.y /= _mass_center.weight;
 
-	//screen_center.X += _mass_center.x;
-	//screen_center.Y += _mass_center.y;
+	double x = screen_center.X + _mass_center.x, y = screen_center.Y + _mass_center.y;
 
-	DrawCross(screen_center.X + _mass_center.px, screen_center.Y + _mass_center.py, cross_size, lcd_backColor);
-	DrawCross(screen_center.X + _mass_center.x, screen_center.Y + _mass_center.y, cross_size, 0xFFFFFF00);
+	DrawCross(_mass_center.px, _mass_center.py, cross_size, lcd_backColor);
+	DrawCross(x, y, cross_size, _mass_center.color);
 
-	_mass_center.px = _mass_center.x;
-	_mass_center.py = _mass_center.y;
+	_mass_center.px = x;
+	_mass_center.py = y;
 
 	return &_mass_center;
 }
 
-static void gravity (object_t * object, object_t * ref_object)
+static void gravity(object_t * object, object_t * ref_object)
 {
 	if (object == ref_object) return; //object cannot be compared to himself
 	if (!object->isAlive || !ref_object->isAlive) return; //dead object (after impact)
@@ -339,7 +341,7 @@ static void gravity (object_t * object, object_t * ref_object)
 	double r2 = dx * dx + dy * dy;
 
 	/* gravity law */
-	double a = - G * ref_object->weight / r2;
+	double a = -G * ref_object->weight / r2;
 	//double a = F / object->weight;
 
 	/* distance */
@@ -350,7 +352,7 @@ static void gravity (object_t * object, object_t * ref_object)
 	object->ay += a * dy / r;
 }
 
-static void process_impact (object_t * object, object_t * ref_object)
+static void process_impact(object_t * object, object_t * ref_object)
 {
 	if (object == ref_object) return; //object cannot be compared to himself
 
@@ -359,7 +361,7 @@ static void process_impact (object_t * object, object_t * ref_object)
 	if (!ref_object->isMassCenter) //we don't check impact with mass center - it is not a phisical object
 		if (check_impact(object, ref_object)) //impact
 		{
-			object_t * o1, * o2;
+			object_t * o1, *o2;
 
 			if (object->weight > ref_object->weight)
 				o1 = object, o2 = ref_object;
@@ -371,10 +373,10 @@ static void process_impact (object_t * object, object_t * ref_object)
 			o2->fillLastTime = true;
 
 			o1->vx = (o1->vx * o1->weight + o2->vx * o2->weight)\
-					/ (o1->weight + o2->weight);
+				/ (o1->weight + o2->weight);
 
 			o1->vy = (o1->vy * o1->weight + o2->vy * o2->weight)\
-					/ (o1->weight + o2->weight);
+				/ (o1->weight + o2->weight);
 
 			o1->weight += o2->weight; //add his mass to reference object
 
@@ -388,14 +390,14 @@ static void process_impact (object_t * object, object_t * ref_object)
 		}
 }
 
-static void process_impact_all (object_t ** object, uint16_t object_s)
+static void process_impact_all(object_t ** object, uint16_t object_s)
 {
 	for (uint8_t i = 0; i != object_s; i++)
 		for (uint8_t j = 0; j != object_s; j++)
 			process_impact(object[i], object[j]);
 }
 
-static void gravity_object_to_object (object_t ** object, uint16_t object_s)
+static void gravity_object_to_object(object_t ** object, uint16_t object_s)
 {
 	for (uint8_t i = 0; i != object_s; i++)
 	{
@@ -408,7 +410,7 @@ static void gravity_object_to_object (object_t ** object, uint16_t object_s)
 			gravity(object[i], object[j]);
 }
 
-static void gravity_oject_to_massCenter (object_t ** object, uint16_t object_s, object_t * massCenter)
+static void gravity_oject_to_massCenter(object_t ** object, uint16_t object_s, object_t * massCenter)
 {
 	for (uint8_t i = 0; i != object_s; i++)
 		gravity(object[i], massCenter);
