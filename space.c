@@ -52,9 +52,9 @@ object_t ** Objects;
 /* Predefined objects */
 object_t planets[] = {
 	{.color = RED32,.r = 50,.vx = 0,.vy = 0,.weight = 10000,.name = "STAR",.x = 0,.y = 0 },
-	{.color = GRAY32,.r = 10,.vx = 0,.vy = 5,.weight = 1000,.name = "PLANET",.x = 500,.y = 0 },
-	{.color = YELLOW32,.r = 5,.vx = 0,.vy = 10.8,.weight = 10,.name = "MOON",.x = 530,.y = 0 },
-	{.color = BLUE32,.r = 10,.vx = 0,.vy = -7,.weight = 100,.name = "MOON",.x = -200,.y = 0 },
+	{.color = GRAY32,.r = 10,.vx = 0,.vy = 5,.weight = 1000,.name = "PLANET",.x = 400,.y = 0 },
+	{.color = YELLOW32,.r = 5,.vx = 0,.vy = 10,.weight = 10,.name = "MOON",.x = 430,.y = 0 },
+	{.color = BLUE32,.r = 10,.vx = 0,.vy = -10,.weight = 100,.name = "MOON",.x = -120,.y = 0 },
 	//{ .color = GREEN32, .r = 10, .vx = -6,. vy = 0, .weight = 1000, .name = "MOON", .x = 0, .y = 500 },
 };
 
