@@ -12,9 +12,12 @@ const uint16_t speed_x10[] = { 1, 10 }; // min, max
 const uint16_t weight[] = { 10, 50 }; // min, max
 const uint32_t colors[] = { WHITE32, RED32, GREEN32, BLUE32, YELLOW32, CYAN32, MAGENTA32, SILVER32, GRAY32, MAROON32, OLIVE32 };
 const char * names[] = { "SUN", "MERCURY", "VENUS", "EARTH", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE" };
-const double G = 10; //gravity constant
-double X = 0, Y = 0; //offset to center screen
+const double G = 1; //gravity constant
 const uint8_t GAP = 5;
+struct 
+{
+	double X, Y;
+}screen_center;
 
 uint16_t lcd_width, lcd_heigh; //lcd properties
 uint32_t lcd_backColor;
@@ -28,13 +31,8 @@ typedef struct
 	uint16_t r; //radius
 	double weight;
 
-	//uint32_t * sprite;
-
-	//current positions and speeds
-	double x_speed, y_speed, acceleration;
-
 	//previous positions
-	double x, y, px, py;
+	double x, y, px, py, vx, vy, ax, ay;
 
 	//object name
 	const char * name;
@@ -53,10 +51,11 @@ object_t ** Objects;
 
 /* Predefined objects */
 object_t planets[] = {
-	{ .color = RED32, .r = 50, .x_speed = 0, .y_speed = -1, .weight = 100, .name = "STAR", .x = 900, .y = 500 },
-	{ .color = GRAY32, .r = 10, .x_speed = 0, .y_speed = 10, .weight = 10, .name = "PLANET", .x = 1200, .y = 500 },
-	{ .color = YELLOW32, .r = 5, .x_speed = 0, .y_speed = 25, .weight = 0.1, .name = "MOON", .x = 1230, .y = 500 },
-	{ .color = BLUE32, .r = 10, .x_speed = 0, .y_speed = -7, .weight = 10, .name = "MOON", .x = 400, .y = 500 },
+	{ .color = RED32, .r = 50, .vx = 0, .vy = 0, .weight = 10000, .name = "STAR", .x = 0, .y = 0 },
+	{ .color = GRAY32, .r = 10, .vx = 0, .vy = 3, .weight = 1000, .name = "PLANET", .x = 500, .y = 0 },
+	{ .color = YELLOW32, .r = 5, .vx = 0, .vy = 8.7, .weight = 10, .name = "MOON", .x = 530, .y = 0 },
+	{ .color = BLUE32, .r = 10, .vx = 0, .vy = -3, .weight = 1000, .name = "MOON", .x = -500, .y = 0 },
+	//{ .color = GREEN32, .r = 10, .vx = -6,. vy = 0, .weight = 1000, .name = "MOON", .x = 0, .y = 500 },
 };
 
 
@@ -67,16 +66,16 @@ static object_t * create_random_object (void);
 static double distance (object_t * o1, object_t * o2);
 static double distanceSquare (object_t * o1, object_t * o2);
 static bool check_impact (object_t * o1, object_t * o2);
-static void move (object_t * object);
-static void draw_object (object_t * object);
+static void move (object_t ** objects, uint16_t object_s);
+static void draw_object (object_t ** objects, uint16_t object_s);
 static void border_impact (object_t * object);
 static object_t * mass_center (object_t ** objects, uint16_t object_s);
 static void gravity (object_t * object, object_t * ref_object);
-static double energy_summary (object_t ** object, uint16_t object_s, object_t * massCenter);
 static void process_impact (object_t * object, object_t * ref_object);
 static void process_impact_all (object_t ** object, uint16_t object_s);
 static void gravity_object_to_object (object_t ** object, uint16_t object_s);
 static void gravity_oject_to_massCenter (object_t ** object, uint16_t object_s, object_t * massCenter);
+static uint32_t mix_color(uint32_t c1, uint32_t c2, double w1, double w2);
 
 /**
  * Initialize and run simulation
@@ -85,6 +84,8 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 {
 	GetScreenSize(&lcd_width, &lcd_heigh);
 	printf("Screen: %u x %u\n", lcd_width, lcd_heigh);
+	screen_center.X = lcd_width / 2;
+	screen_center.Y = lcd_heigh / 2;
 
 	ClearScreen(lcd_backColor = backColor);
 
@@ -96,10 +97,15 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 	while(1)
 	{
 		usleep(10000);
-		for (uint8_t i = 0; i != objects_s; i++)
+		//for (uint8_t i = 0; i != objects_s; i++)
 		{
+			mass_center(Objects, objects_s);
+			//gravity_oject_to_massCenter(Objects, objects_s, _mass_center);
+
 			// MOVEMENT
-			move(Objects[i]);
+			move(Objects, objects_s);
+
+			draw_object(Objects, objects_s);
 
 			// BORDER IMPACT
 			//border_impact(Objects[i]);
@@ -109,11 +115,6 @@ void space_init (uint16_t objects_s, uint32_t backColor)
 
 			// GRAVITY FOR EACH OBJECT OR TO MASS CENTER
 			gravity_object_to_object(Objects, objects_s);
-
-			object_t * _mass_center = mass_center(Objects, objects_s);
-			//gravity_oject_to_massCenter(Objects, objects_s, _mass_center);
-
-			//energy_summary(Objects, objects_s, _mass_center);
 		}
 		FrameBufferUpdate();
 	}
@@ -150,7 +151,7 @@ static object_t ** create_predefined_objects (uint16_t * amount)
 		_objects[i]->fillLastTime = false;
 
 		printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %4.0f\n",\
-				_objects[i]->name, _objects[i]->x, _objects[i]->y, _objects[i]->r, _objects[i]->x_speed, _objects[i]->y_speed, _objects[i]->weight);
+				_objects[i]->name, _objects[i]->x, _objects[i]->y, _objects[i]->r, _objects[i]->vx, _objects[i]->vy, _objects[i]->weight);
 	}
 
 	return _objects;
@@ -182,8 +183,8 @@ static object_t * create_random_object (void)
 	object->r = rand() % (radius[1] - radius[0]) + radius[0];
 	object->x = rand() % (lcd_width - 2 * object->r) + object->r;
 	object->y = rand() % (lcd_heigh - 2 * object->r) + object->r;
-	object->x_speed = rand() % (speed_x10[1] - speed_x10[0]) + speed_x10[0];
-	object->y_speed = rand() % (speed_x10[1] - speed_x10[0]) + speed_x10[0];
+	object->vx = rand() % (speed_x10[1] - speed_x10[0]) + speed_x10[0];
+	object->vy = rand() % (speed_x10[1] - speed_x10[0]) + speed_x10[0];
 	object->color = colors[rand() % (sizeof(colors) / sizeof(colors[0]))];
 	object->px = 0;
 	object->py = 0;
@@ -202,11 +203,11 @@ static object_t * create_random_object (void)
 	}
 	i++;
 
-	object->x_speed *= rand() > rand() ? 1 : -1;
-	object->y_speed *= rand() > rand() ? 1 : -1;
+	object->vx *= rand() > rand() ? 1 : -1;
+	object->vy *= rand() > rand() ? 1 : -1;
 
 	printf("Name: %s\tx = %4.0f\ty = %4.0f\tr = %u\tx speed = %3.0f\ty speed = %3.0f\tWeight = %3.0f\n",\
-			object->name, object->x, object->y, object->r, object->x_speed, object->y_speed, object->weight);
+			object->name, object->x, object->y, object->r, object->vx, object->vy, object->weight);
 
 	return object;
 }
@@ -230,59 +231,64 @@ static bool check_impact (object_t * o1, object_t * o2)
 	return distance(o1, o2) < (o1->r + o2->r) ? true : false;
 }
 
-static void move (object_t * object)
+static void move (object_t ** objects, uint16_t object_s)
 {
-	if (!object->isMoving)
-		return;
+	for (uint16_t i = 0; i != object_s; i++)
+	{
+		if (!objects[i]->isMoving)
+			continue;
 
-	object->x += object->x_speed / 10 - X;
-	object->y += object->y_speed / 10 - Y;
+		/* acceleration -> speed */
+		objects[i]->vx += objects[i]->ax;
+		objects[i]->vy += objects[i]->ay;
 
-	draw_object(object);
+		/* speed -> position */
+		objects[i]->x += objects[i]->vx;
+		objects[i]->y += objects[i]->vy;
+	}
 }
 
-static void draw_object (object_t * object)
+static void draw_object (object_t ** objects, uint16_t object_s)
 {
-	if ((uint16_t)object->px == (uint16_t)object->x && (uint16_t)object->py == (uint16_t)object->y) return;
-
-	if (object->fillLastTime)
+	for (uint16_t i = 0; i != object_s; i++)
 	{
-		object->fillLastTime = false;
-		DrawFilledCircle32(object->px, object->py, object->r, lcd_backColor); //remove object last time
+		if (objects[i]->fillLastTime)
+		{
+			objects[i]->fillLastTime = false;
+			DrawFilledCircle32(screen_center.X + objects[i]->px, screen_center.Y + objects[i]->py, objects[i]->r, lcd_backColor); //remove object last time
+		}
+
+		if (!objects[i]->isAlive)
+			continue;
+
+		if (objects[i]->px || objects[i]->py)
+			DrawFilledCircle32(screen_center.X + objects[i]->px, screen_center.Y + objects[i]->py, objects[i]->r, lcd_backColor); //remove object before redraw
+
+		if (screen_center.X + objects[i]->x < objects[i]->r + GAP || screen_center.Y + objects[i]->y < objects[i]->r + GAP || \
+			screen_center.X + objects[i]->x > lcd_width - objects[i]->r - GAP || screen_center.Y + objects[i]->y > lcd_heigh - objects[i]->r - GAP)
+			continue;
+
+		objects[i]->px = objects[i]->x;
+		objects[i]->py = objects[i]->y;
+
+		if (!objects[i]->isAlive) continue;
+
+		DrawFilledCircle32(screen_center.X + objects[i]->x, screen_center.Y + objects[i]->y, objects[i]->r, objects[i]->color);
+
+		if (objects[i]->name)
+		{
+			if (strlen(objects[i]->name) * font.FontXsize / 2 > objects[i]->r) continue;
+			font.BackColor = objects[i]->color;
+			font.FontColor = ~objects[i]->color;
+			PrintText(screen_center.X + objects[i]->x - strlen(objects[i]->name) * font.FontXsize / 2, screen_center.Y + objects[i]->y - font.FontYsize / 2, objects[i]->name);
+		}
 	}
-
-	if (!object->isAlive)
-		return;
-
-	if (object->px && object->py)
-		DrawFilledCircle32(object->px, object->py, object->r, lcd_backColor); //remove object before redraw
-
-	if (object->x < object->r + GAP || object->y < object->r + GAP || \
-			object->x > lcd_width - object->r - GAP || object->y > lcd_heigh - object->r - GAP)
-		return;
-
-	object->px = object->x;
-	object->py = object->y;
-
-	if (!object->isAlive) return;
-
-	DrawFilledCircle32(object->x, object->y, object->r, object->color);
-
-	if (object->name)
-	{
-		if (strlen(object->name) * font.FontXsize / 2 > object->r) return;
-		font.BackColor = object->color;
-		font.FontColor = ~object->color;
-		PrintText(object->x - strlen(object->name) * font.FontXsize / 2, object->y - font.FontYsize / 2, object->name);
-	}
-
-	//FrameBufferUpdate();
 }
 
 static void border_impact (object_t * object)
 {
-	if ((object->x <= (object->r + 5)) || (object->x >= (lcd_width - object->r - 5))) object->x_speed *= -1;
-	if ((object->y <= (object->r + 5)) || (object->y >= (lcd_heigh - object->r - 5))) object->y_speed *= -1;
+	if ((object->x <= (object->r + 5)) || (object->x >= (lcd_width - object->r - 5))) object->vx *= -1;
+	if ((object->y <= (object->r + 5)) || (object->y >= (lcd_heigh - object->r - 5))) object->vy *= -1;
 }
 
 static object_t * mass_center (object_t ** objects, uint16_t object_s)
@@ -308,11 +314,11 @@ static object_t * mass_center (object_t ** objects, uint16_t object_s)
 	_mass_center.x /= _mass_center.weight;
 	_mass_center.y /= _mass_center.weight;
 
-	X = _mass_center.x - lcd_width / 2;
-	Y = _mass_center.y - lcd_heigh / 2;
+	//screen_center.X += _mass_center.x;
+	//screen_center.Y += _mass_center.y;
 
-	DrawCross(_mass_center.px, _mass_center.py, cross_size, lcd_backColor);
-	DrawCross(_mass_center.x, _mass_center.y, cross_size, 0xFFFFFF00);
+	DrawCross(screen_center.X + _mass_center.px, screen_center.Y + _mass_center.py, cross_size, lcd_backColor);
+	DrawCross(screen_center.X + _mass_center.x, screen_center.Y + _mass_center.y, cross_size, 0xFFFFFF00);
 
 	_mass_center.px = _mass_center.x;
 	_mass_center.py = _mass_center.y;
@@ -325,39 +331,23 @@ static void gravity (object_t * object, object_t * ref_object)
 	if (object == ref_object) return; //object cannot be compared to himself
 	if (!object->isAlive || !ref_object->isAlive) return; //dead object (after impact)
 
-	double _distanceSquare = distanceSquare(object, ref_object);
+	/* positions */
+	double dx = object->x - ref_object->x;
+	double dy = object->y - ref_object->y;
 
-	//angle between object and ref_object
-	double alpha = atan2((object->y - ref_object->y), (object->x - ref_object->x));
+	/* distance ^2 */
+	double r2 = dx * dx + dy * dy;
 
-	//absolute acceleration from gravity law
-	object->acceleration = - G * ref_object->weight / _distanceSquare;
+	/* gravity law */
+	double a = - G * ref_object->weight / r2;
+	//double a = F / object->weight;
 
-	//apply acceleration
-	object->x_speed += object->acceleration * cos(alpha);
-	object->y_speed += object->acceleration * sin(alpha);
-}
+	/* distance */
+	double r = sqrt(r2);
 
-static double energy_summary (object_t ** object, uint16_t object_s, object_t * massCenter)
-{
-	static uint16_t j = 0;
-	double potential_energy = 0, cinetic_energy = 0;
-
-	for (uint16_t i = 0; i < object_s; i++)
-	{
-		potential_energy += object[i]->weight * (object[i]->x_speed * object[i]->x_speed + object[i]->y_speed * object[i]->y_speed) / 2;
-		cinetic_energy += - object[i]->weight * object[i]->acceleration * distance(object[i], massCenter);
-	}
-
-
-	if (++j == 100)
-	{
-		j = 0;
-		printf("Pot energy: %.1f\tCinetic energy: %.1f\tSumm: %.1f\n", \
-				potential_energy, cinetic_energy, potential_energy + cinetic_energy);
-	}
-
-	return potential_energy;
+	/* acceleration */
+	object->ax += a * dx / r;
+	object->ay += a * dy / r;
 }
 
 static void process_impact (object_t * object, object_t * ref_object)
@@ -380,17 +370,17 @@ static void process_impact (object_t * object, object_t * ref_object)
 			o1->isAlive = true; //second object survive
 			o2->fillLastTime = true;
 
-			o1->x_speed = (o1->x_speed * o1->weight + o2->x_speed * o2->weight)\
+			o1->vx = (o1->vx * o1->weight + o2->vx * o2->weight)\
 					/ (o1->weight + o2->weight);
 
-			o1->y_speed = (o1->y_speed * o1->weight + o2->y_speed * o2->weight)\
+			o1->vy = (o1->vy * o1->weight + o2->vy * o2->weight)\
 					/ (o1->weight + o2->weight);
 
 			o1->weight += o2->weight; //add his mass to reference object
 
 			o1->r = sqrt(pow(o2->r, 2) + pow(o1->r, 2)); //and increase size
 
-			o1->color = (o1->color + o2->color) / 2; //mix color
+			o1->color = mix_color(o1->color, o2->color, o1->weight, o2->weight);
 
 			printf("Impact between %s and %s\n", o1->name, o2->name);
 
@@ -408,6 +398,12 @@ static void process_impact_all (object_t ** object, uint16_t object_s)
 static void gravity_object_to_object (object_t ** object, uint16_t object_s)
 {
 	for (uint8_t i = 0; i != object_s; i++)
+	{
+		object[i]->ax = 0;
+		object[i]->ay = 0;
+	}
+
+	for (uint8_t i = 0; i != object_s; i++)
 		for (uint8_t j = 0; j != object_s; j++)
 			gravity(object[i], object[j]);
 }
@@ -416,4 +412,23 @@ static void gravity_oject_to_massCenter (object_t ** object, uint16_t object_s, 
 {
 	for (uint8_t i = 0; i != object_s; i++)
 		gravity(object[i], massCenter);
+}
+
+static uint32_t mix_color(uint32_t c1, uint32_t c2, double w1, double w2)
+{
+	union
+	{
+		uint8_t r, g, b, a;
+		uint32_t rgb32;
+	}rgb[3];
+
+	rgb[0].rgb32 = c1;
+	rgb[1].rgb32 = c2;
+
+	rgb[2].r = (rgb[0].r * w1 + rgb[1].r * w2) / (w1 + w2);
+	rgb[2].g = (rgb[0].g * w1 + rgb[1].g * w2) / (w1 + w2);
+	rgb[2].b = (rgb[0].b * w1 + rgb[1].b * w2) / (w1 + w2);
+	rgb[2].a = 0xFF;
+
+	return rgb[2].rgb32;
 }
