@@ -97,7 +97,6 @@ void space_init(uint16_t objects_s, uint32_t backColor)
 	while (1)
 	{
 		usleep(10000);
-		object_t * _mass_center = mass_center(Objects, objects_s);
 		//gravity_oject_to_massCenter(Objects, objects_s, _mass_center);
 
 		// MOVEMENT
@@ -114,11 +113,12 @@ void space_init(uint16_t objects_s, uint32_t backColor)
 		// GRAVITY FOR EACH OBJECT OR TO MASS CENTER
 		gravity_object_to_object(Objects, objects_s);
 
-		FrameBufferUpdate();
-
 		/* Center mass -> screen center */
+		object_t * _mass_center = mass_center(Objects, objects_s);
 		screen_center.X = lcd_width / 2 - _mass_center->x;
 		screen_center.Y = lcd_heigh / 2 - _mass_center->y;
+
+		FrameBufferUpdate();
 	}
 }
 
